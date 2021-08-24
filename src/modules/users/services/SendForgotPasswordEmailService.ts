@@ -1,10 +1,9 @@
 import AppError from '@shared/errors/AppError';
-import { config } from 'process';
 import { getCustomRepository } from 'typeorm';
+import path from 'path';
 import UserRepository from '../typeorm/repositories/UserRepository';
 import UserTokensRepository from '../typeorm/repositories/UserTokensRepository';
 import EtherealMail from '@config/mail/EtherealMail';
-import UserToken from '../typeorm/entities/UserToken';
 
 interface IRequest {
   email: string;
@@ -21,15 +20,28 @@ class SendForgotPasswordEmailService {
       throw new AppError('Usuário não encontrado!');
     }
 
-    console.log(user);
+    const { token } = await userTokensRepository.generate(user.id);
 
-    const token = await userTokensRepository.generate(user.id);
-
-    console.log(token);
+    const forgotPasswordTemplate = path.resolve(
+      __dirname,
+      '..',
+      'views',
+      'forgotPassword.hbs',
+    );
 
     await EtherealMail.sendMail({
-      to: email,
-      body: `Solicitação de redefinição de senha recebida: ${token?.token}`,
+      to: {
+        name: user.name,
+        email: user.email,
+      },
+      subject: '[API vendas] recuperação de senha',
+      templateData: {
+        file: forgotPasswordTemplate,
+        variables: {
+          name: user.name,
+          link: `http://localhost:3000/resetPassword?token=${token}`,
+        },
+      },
     });
   }
 }
